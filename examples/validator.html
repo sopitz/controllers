@@ -1,0 +1,35 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>form validator html</title>
+<script type="text/javascript" src="../../lib/js/jquery.min.js"></script>
+<script type="text/javascript">
+var form = "#myform";
+var button = "#senddata";
+var url = "form.php";
+$(document).ready(function() {
+	var data = new Array();
+	$(button).click(function() {
+		$(form).children().filter(':input').each(function(){
+			data.push(new Array(this.type, this.name, this.value, this.required));
+		});
+		$.ajax({type:"POST", url: url, data: {data: JSON.stringify(data) }});
+	})
+})
+</script>
+</head>
+<body>
+
+<form id="myform">
+	<input type="email" name="pemail"></input>email<br />
+	<input type="tel" name="ptel"></input>tel<br />
+	<input type="url" name="purl"></input>url<br />
+	<input type="datetime" name="pdatetime">datum</input><br />
+	<input type="text" name="ptext" required>text(*)</input><br />
+	<input type="number" name="pnumber"></input>zahl<br />
+	<input type="street" name="pnumber"></input>straße<br />
+</form>
+<input type="button" id="senddata" value="send" />
+</body>
+</html>
