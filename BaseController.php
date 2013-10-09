@@ -11,7 +11,7 @@ use Monolog\Logger;
 
 abstract class BaseController {
 	
-	public static $log; // for logging
+	public static $log;
 	
 	/* ### magic area ### */
 	public function __construct() {
