@@ -1,9 +1,8 @@
 <?php
 // to be extended by all controllers
 
-include_once '../../base.php';
+include_once 'base.php';
 include_once 'BaseInterface.php';
-require_once "../../vendor/autoload.php";
 require 'DbConnector.php';
 
 use Monolog\Handler\StreamHandler;
@@ -12,7 +11,7 @@ use Monolog\Logger;
 
 abstract class BaseController {
 	
-	public static $log;
+	public static $log; // for logging
 	
 	/* ### magic area ### */
 	public function __construct() {
