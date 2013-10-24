@@ -1,5 +1,8 @@
 <?php
-require_once 'BaseController.php';
+require_once Base::$baseurl_filesys_tms.'/interfaces/IEntityManager.php';
+require_once Base::$baseurl_filesys_tms.'/interfaces/IValidator.php';
+//require_once 'BaseController.php';
+require_once Base::$baseurl_filesys.'/lib/controllers/Validator.php';
 /**
  * @desc <b>Mailer</b> - send and persist Mails.
  * @desc <p>public methods:</p><ul><li>g</li></ul>
@@ -7,118 +10,185 @@ require_once 'BaseController.php';
  * @todo 
  * @version 0.0.1
  */
-class EntityManager extends BaseController implements IEntityManager  {
+class Mailer extends BaseController implements IEntityManager  {
 	
-	/**
-	 * @see EntityManager
-	 */
+	public $data = array();
+	public $errors = array();
+	public $errorFeedback = "The following errors occured:<br>";
+	
 	public function __construct() {
 		if (Base::$environment == "development") {
 			// load tms.sql from examples folder and run statements
+			//print_r($_POST);
 		}
 	}
 	
-	private function loadTemplateByTemplateName($templateName) {
-		$file = "email/templates/".$templateName.".html";
+	private function loadTemplateByTemplateName($templateName, $data) {
+		//$file = Base::$baseurl_filesys_tms."email/templates/".$templateName.".php?". $dataString ."";
+		$file = Base::$baseurl_filesys_tms."email/templates/".$templateName.".php";
 		if (!file_exists($file)) {
-			die("you got a problem with your email configs!!");
+			die("you got a problem with your template configs!!");
 		}
-		return file_get_contents($file);
+		include $file;
+
+		$output = ob_get_contents();
+
+		ob_end_clean();
+		
+		return $output;	
 	}
-	
-	private function loadTemplateModelByTemplateName($templateName) {
-		$file = "email/templates/models/".$templateName.".xml";
+	/**
+	* @author rlais
+	* @desc   loads template model
+	* @param  templateModelName
+	* @return simpleXML
+	*/
+	private function loadTemplateModelByTemplateName($templateModelName) {
+		$file = Base::$baseurl_filesys_tms."email/templates/models/mail_model.xml";
 		if (!file_exists($file)) {
-			die("you got a problem with your email configs!!");
+			die("you got a problem with your templateModel configs!!");
 		}
 		return simplexml_load_file($file);
 	}
-	
-	private function validateDate($templateName, $data) {
-		$model = $this->loadTemplateModelByTemplateName($templateName);
+	/**
+	* @author rlais
+	* @desc   validates user input with xml model
+	* @param  templateModelName, templateName, data
+	* @return true if valid
+	*/
+	private function validateData($templateModelName, $templateName, $data) {
+		$modeldata = $this->loadTemplateModelByTemplateName($templateModelName);
 		/* check if model and $data match */
-		
-		return true;
+		$validator = new Validator();
+		foreach ($modeldata as $model) {
+			foreach ($model as $field) {
+				$userdata = false;
+				/* receive data */
+				$userdata = $data[''.$field->getName().''];
+				
+				if ($field->mandatory == 1 && !($userdata)) {
+					// TODO: errormanagement to give back to user
+					$this->errorFeedback .= $field->getName()." is mandatory but not set!<br />";
+				}
+				
+				if (!$validator->checkNotEmpty($userdata)) {
+					array_push($this->errors, $field->getName()." is not a valid string. It must not be empty.<br />");
+				} else {
+					array_push($this->data, array($field->getName(), $userdata, $field->type));
+				}	
+			}
+		}
+		if(empty($this->errors))
+			return true;
+		else
+			return false;
 	}
-	
+	/**
+	* @author rlais
+	* @desc   binds data to text model
+	* @param  templateName, data
+	* @return data-filled text
+	*/
 	private function bindDataToText($templateName, $data) {
-		$text = $this->loadTemplateByTemplateName($event);
-		/* bind data to text */
+	/*	foreach($data as $key => $value) {
+			${$key} = $value;
+		}
+	*/
+	/*	$dataString = "";
+		foreach($data as $key => $value) {
+		//	${$key} = $value;
+			$dataString .= $key ."=". $value ."&";
+		//	echo "<br>K: ". $key ."<br>";
+		}
+	*/	
+		$text = $this->loadTemplateByTemplateName($templateName, $data);
+		//$filledText = file_get_contents($text."?".$dataString);
+		return $text;
 	}
-	
-	public function send($event, $data) {
-		if ($this->validateDate($event, $data));
-		$text = $this->bindDataToText($event, $data);
+	/**
+	* @author rlais
+	* @desc   sends mail
+	* @param  templateName, data
+	* @return data-filled text
+	*/
+	public function send($templateModelName, $templateName, $data) {
+		if($this->validateData($templateModelName, $templateName, $data)) {
+			$text = $this->bindDataToText($templateName, $data);
+			
 		
+			
 		
-		$to = "simon@opitzfamily.de";
-		$subject = "test mit att";
-		$message ="message body";
-		$anhang = array();
-		$anhang["name"] = "agreement.pdf";
-		$anhang["size"] = filesize('/var/www/registration/test2.pdf');
-		$anhang["type"] = filetype('/var/www/registration/test2.pdf');
-		$anhang["data"] = implode("",file('/var/www/registration/test2.pdf'));
+			$to = $data['recipient_email'];
+			$subject = ucfirst($data['type_of_email']);
+			$message = $text;
+			$anhang = $data['attachments'];
+			
+			
+			$absender = $data['sender_name'];
+			$absender_mail = $data['sender_email'];
+			$reply = $data['reply_to'];
+			
+			$mime_boundary = "-----=" . md5(uniqid(mt_rand(), 1));
+			
+			$header  ="From:".$absender."<".$absender_mail.">\n";
+			$header .= "Reply-To: ".$reply."\n";
+			
+			$header.= "MIME-Version: 1.0\r\n";
+			$header.= "Content-Type: multipart/mixed;" . "\r\n";
+			$header.= " boundary=\"".$mime_boundary."\"\r\n";
+			
+			$content = "This is a multi-part message in MIME format.\r\n\r\n";
+			$content.= "--".$mime_boundary."\r\n";
+			$content.= "Content-Type: text/html; charset=\"utf-8\"\r\n";
+			$content.= "Content-Transfer-Encoding: 8bit\r\n\r\n";
+			$content.= $message;
+			
+			
+			
+			
 		
-		
-		$absender = "Mein Name";
-		$absender_mail = Base::$mailfrom;
-		$reply = "antwort@adresse";
-		
-		$mime_boundary = "-----=" . md5(uniqid(mt_rand(), 1));
-		
-		$header  ="From:".$absender."<".$absender_mail.">\n";
-		$header .= "Reply-To: ".$reply."\n";
-		
-		$header.= "MIME-Version: 1.0\r\n";
-		$header.= "Content-Type: multipart/mixed;\r\n";
-		$header.= " boundary=\"".$mime_boundary."\"\r\n";
-		
-		$content = "This is a multi-part message in MIME format.\r\n\r\n";
-		$content.= "--".$mime_boundary."\r\n";
-		$content.= "Content-Type: text/html charset=\"iso-8859-1\"\r\n";
-		$content.= "Content-Transfer-Encoding: 8bit\r\n\r\n";
-		$content.= $message."\r\n";
-		
-		if(is_array($anhang) AND is_array(current($anhang)))
-		{
-			foreach($anhang AS $dat)
-			{
-				$data = chunk_split(base64_encode($dat['data']));
+			$attachments = explode(",", $data['attachments']);			
+			
+			$content .= "\n";	
+			
+			foreach($attachments as $file) {
+				$filename = split('/', $file);
+				$numSplits = count($filename) -1;
+				$filename = $filename[$numSplits];
+				$data = chunk_split(base64_encode(implode("",file($file))));
 				$content.= "--".$mime_boundary."\r\n";
 				$content.= "Content-Disposition: attachment;\r\n";
-				$content.= "\tfilename=\"".$dat['name']."\";\r\n";
-				$content.= "Content-Length: .".$dat['size'].";\r\n";
-				$content.= "Content-Type: ".$dat['type']."; name=\"".$dat['name']."\"\r\n";
+				$content.= "\tfilename=\"".$filename."\";\r\n";
+				$content.= "Content-Length: .".filesize($file).";\r\n";
+				$content.= "Content-Type: ".filetype($file)."; name=\"".$filename."\"\r\n";
 				$content.= "Content-Transfer-Encoding: base64\r\n\r\n";
 				$content.= $data."\r\n";
 			}
 			$content .= "--".$mime_boundary."--";
+			
+			
+			
+			
+			if(mail($to, $subject, $content, $header))
+				echo "Mail sent succesfully!";
+		
+		
+			/* add mail to db */
+	 		//$database = DbConnector::create();
+	 		//$query = "SELECT DISTINCT `entityName` FROM project_has_entities WHERE `projectShortcut` LIKE '$projectShortcut'";
+	 		//$result = $database->query($query);
+				/* bundle attachements and store them into blob */
+				/* store subject */
+				/* store text */
+			/* send mail */
 		}
-		else //Nur 1 Datei als Anhang
-		{
-			$data = chunk_split(base64_encode($anhang['data']));
-			$content.= "--".$mime_boundary."\r\n";
-			$content.= "Content-Disposition: attachment;\r\n";
-			$content.= "\tfilename=\"".$anhang['name']."\";\r\n";
-			$content.= "Content-Length: .".$dat['size'].";\r\n";
-			$content.= "Content-Type: ".$anhang['type']."; name=\"".$anhang['name']."\"\r\n";
-			$content.= "Content-Transfer-Encoding: base64\r\n\r\n";
-			$content.= $data."\r\n";
+		else {
+			echo "<br><br>". $this->errorFeedback;
 		}
-		
-		
-		
-		
-		mail($to, $subject, $content, $header);
-		
-		/* add mail to db */
-// 		$database = DbConnector::create();
-// 		$query = "SELECT DISTINCT `entityName` FROM project_has_entities WHERE `projectShortcut` LIKE '$projectShortcut'";
-// 		$result = $database->query($query);
-			/* bundle attachements and store them into blob */
-			/* store subject */
-			/* store text */
-		/* send mail */
 	}
+	
+	public function persistPNVData($projectShortcut, $partnerID, $partnerObj) {}
+	public function getEntitiesListfromProjectShortcut($projectShortcut) {}
+	public function getEntitiesSettingsfromEntityName($entity) {}
+	public function createJSClassfromProjectShortcut($projectShortcut) {}
 }
