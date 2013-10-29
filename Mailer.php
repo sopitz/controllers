@@ -1,8 +1,4 @@
 <?php
-require_once Base::$baseurl_filesys_tms.'/interfaces/IEntityManager.php';
-require_once Base::$baseurl_filesys_tms.'/interfaces/IValidator.php';
-//require_once 'BaseController.php';
-require_once Base::$baseurl_filesys.'/lib/controllers/Validator.php';
 /**
  * @desc <b>Mailer</b> - send and persist Mails.
  * @desc <p>public methods:</p><ul><li>g</li></ul>
@@ -10,7 +6,7 @@ require_once Base::$baseurl_filesys.'/lib/controllers/Validator.php';
  * @todo 
  * @version 0.0.1
  */
-class Mailer extends BaseController implements IEntityManager  {
+class Mailer extends BaseController  {
 	
 	public $data = array();
 	public $errors = array();
@@ -186,9 +182,4 @@ class Mailer extends BaseController implements IEntityManager  {
 			echo "<br><br>". $this->errorFeedback;
 		}
 	}
-	
-	public function persistPNVData($projectShortcut, $partnerID, $partnerObj) {}
-	public function getEntitiesListfromProjectShortcut($projectShortcut) {}
-	public function getEntitiesSettingsfromEntityName($entity) {}
-	public function createJSClassfromProjectShortcut($projectShortcut) {}
 }
