@@ -30,7 +30,7 @@ abstract class BaseController {
 		$appname = str_replace(" ", "", Base::$appname);
 		$log = new Logger($appname);
 		// todo path from base url not from local root
-		$log->pushHandler(new StreamHandler('/Applications/XAMPP/htdocs/tms/log/'.$appname.'.log', Logger::INFO));
+		$log->pushHandler(new StreamHandler('/Applications/XAMPP/htdocs/tms/log/'.$appname.'.log', Logger::INFO)); //FIXME: no absolute paths Base::$baseurlfilesys
 		return $log;
 	}
 	
